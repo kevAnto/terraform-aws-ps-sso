@@ -1,10 +1,8 @@
 terraform {
-  backend "remote" {
-    hostname     = "app.terraform.io"
-    organization = "kevanto"
-
-    workspaces {
-      prefix = "ps-sso-"
-    }
+  backend "s3" {
+    bucket = "remote-state-app"
+    region = "us-east-1"
+    key    = "Atlantis/terraform.tfstate"
   }
 }
+
