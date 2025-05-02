@@ -1,5 +1,5 @@
-variable "region" {
-  description = "AWS region to create resources in"
-  type        = string
-  default     = "us-east-1"
-}
+variable "vpc_cidr_block" {}
+variable "subnet_cidr_block" {}
+variable "avail_zone" {}
+variable "env_prefix" {}
+variable "instance_type" {}
