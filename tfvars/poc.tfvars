@@ -4,7 +4,7 @@ permissions_list = [
         description       = "AdministratorAccess"
         session_duration  = null
         managed_policies  = ["arn:aws:iam::aws:policy/AdministratorAccess"]
-        aws_accounts      = ["40093410499"]
+        aws_accounts      = ["557870048537"]
         sso_groups        = ["AdministratorGroup", "PS-Administrator"]
     },
     {
