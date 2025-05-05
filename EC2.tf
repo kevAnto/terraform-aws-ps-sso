@@ -9,7 +9,7 @@ resource "aws_instance" "splunk_search_head" {
   iam_instance_profile   = aws_iam_instance_profile.splunk_profile.name
 
   depends_on = [
-    aws_vpc.main,
+    aws_vpc.splunk_vpc,
     aws_subnet.private,
     aws_security_group.splunk_sg
     # Other resources that must exist first
