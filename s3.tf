@@ -1,7 +1,6 @@
 
 resource "aws_s3_bucket" "splunk_smartstore" {
   bucket = "splunk-smartstore-${var.environment}"
-  region = "us-east-1"
 
   tags = {
     Name        = "splunk-smartstore"
