@@ -39,7 +39,7 @@ resource "aws_lb_listener" "splunk_sh_listener" {
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-2016-08"
-  certificate_arn   = "arn:aws:acm:us-east-1:123456789012:certificate/example-cert-arn" # Replace with your cert ARN
+  ##certificate_arn   = "arn:aws:acm:us-east-1:123456789012:certificate/example-cert-arn" # Replace with your cert ARN
 
   default_action {
     type             = "forward"
