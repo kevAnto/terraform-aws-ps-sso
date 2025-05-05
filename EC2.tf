@@ -8,6 +8,13 @@ resource "aws_instance" "splunk_search_head" {
   subnet_id              = aws_subnet.private_subnets[count.index % length(aws_subnet.private_subnets)].id
   iam_instance_profile   = aws_iam_instance_profile.splunk_profile.name
 
+  depends_on = [
+    aws_vpc.main,
+    aws_subnet.private,
+    aws_security_group.splunk_sg
+    # Other resources that must exist first
+  ]
+
   root_block_device {
     volume_type = "gp3"
     volume_size = 100
