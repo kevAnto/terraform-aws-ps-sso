@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
 output "search_head_lb_dns" {
   description = "DNS name of the search head load balancer"
@@ -17,4 +18,3 @@ output "indexer_private_ips" {
 output "search_head_private_ips" {
   description = "Private IPs of the search heads"
   value       = aws_instance.splunk_search_head[*].private_ip
-}
