@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-
 output "search_head_lb_dns" {
   description = "DNS name of the search head load balancer"
   value       = aws_lb.splunk_sh_lb.dns_name
