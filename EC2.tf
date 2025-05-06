@@ -4,7 +4,7 @@ resource "aws_instance" "splunk_search_head" {
   instance_type = var.search_head_instance_type
   subnet_id     = element(aws_subnet.public_subnets[*].id, count.index % length(aws_subnet.public_subnets))
   vpc_security_group_ids = [aws_security_group.splunk_sg.id]
-  key_name      = var.key_name
+  #key_name      = var.key_name
   iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
   #associate_public_ip_address = true
 
@@ -44,7 +44,7 @@ resource "aws_instance" "splunk_indexer" {
   instance_type = var.indexer_instance_type
   subnet_id     = element(aws_subnet.private_subnets[*].id, count.index % length(aws_subnet.private_subnets))
   vpc_security_group_ids = [aws_security_group.splunk_sg.id]
-  key_name      = var.key_name
+  #key_name      = var.key_name
   iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
   #associate_public_ip_address = true
 
@@ -71,7 +71,7 @@ resource "aws_instance" "splunk_cluster_manager" {
   instance_type = var.cluster_manager_instance_type
   subnet_id     = aws_subnet.private_subnets[0].id
   vpc_security_group_ids = [aws_security_group.splunk_sg.id]
-  key_name      = var.key_name
+  #key_name      = var.key_name
   iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
   #associate_public_ip_address = true
 
@@ -98,7 +98,7 @@ resource "aws_instance" "splunk_monitoring_console" {
   instance_type = var.monitoring_console_instance_type
   subnet_id     = aws_subnet.private_subnets[0].id
   vpc_security_group_ids = [aws_security_group.splunk_sg.id]
-  key_name      = var.key_name
+  #key_name      = var.key_name
   iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
   #associate_public_ip_address = true
 
@@ -125,7 +125,7 @@ resource "aws_instance" "splunk_license_manager" {
   instance_type               = var.license_manager_instance_type
   subnet_id                   = aws_subnet.private_subnets[0].id
   vpc_security_group_ids      = [aws_security_group.splunk_sg.id]
-  key_name                    = var.key_name
+  #key_name                    = var.key_name
   iam_instance_profile        = aws_iam_instance_profile.ssm_instance_profile.name
   #associate_public_ip_address = true
 

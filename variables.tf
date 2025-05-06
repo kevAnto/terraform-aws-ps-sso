@@ -26,13 +26,13 @@ variable "private_subnet_cidrs" {
 variable "availability_zones" {
   description = "AWS Availability Zones"
   type        = list(string)
-  default     = ["ca-central-1a", "ca-central-1b", "ca-central-1c"]
+  default     = ["ca-central-1a", "ca-central-1b", "ca-central-1d"]
 }
 
 variable "splunk_ami" {
   description = "AMI ID for Splunk instances"
   type        = string
-  default     = "ami-0ff8a91507f77f867" # Replace with actual Splunk AMI
+  default     = "ami-03afc49e3def9a472" # Replace with actual Splunk AMI
 }
 
 variable "search_head_instance_type" {
@@ -65,8 +65,8 @@ variable "license_manager_instance_type" {
   default     = "t2.micro" #"c5.large"
 }
 
-variable "key_name" {
-  description = "SSH key pair name"
-  type        = string
-  default     = "splunk-key" # Replace with your actual key pair name
-}
+#variable "key_name" {
+#  description = "SSH key pair name"
+#  type        = string
+#  default     = "splunk-key" # Replace with your actual key pair name
+#}
