@@ -1,14 +1,22 @@
 resource "aws_security_group" "splunk_sg" {
-  name        = "splunk-security-group"
+  name        = "splunk-sg"
   description = "Security group for Splunk instances"
   vpc_id      = aws_vpc.splunk_vpc.id
 
   ingress {
-    from_port   = 22
-    to_port     = 22
+    from_port   = 80
+    to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "SSH access"
+    description = "HTTP access"
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS access"
   }
 
   ingress {
@@ -28,11 +36,35 @@ resource "aws_security_group" "splunk_sg" {
   }
 
   ingress {
+    from_port   = 8191
+    to_port     = 8191
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.splunk_vpc.cidr_block]
+    description = "Cluster replication"
+  }
+
+  ingress {
+    from_port   = 9887
+    to_port     = 9887
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.splunk_vpc.cidr_block]
+    description = "App server feedback"
+  }
+
+  ingress {
     from_port   = 9997
     to_port     = 9997
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Splunk Indexer port"
+    cidr_blocks = [aws_vpc.splunk_vpc.cidr_block]
+    description = "Data forwarding"
+  }
+
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [aws_vpc.splunk_vpc.cidr_block]
+    description = "Internal VPC communication"
   }
 
   egress {
@@ -40,6 +72,7 @@ resource "aws_security_group" "splunk_sg" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "All outbound traffic"
   }
 
   tags = {
@@ -48,11 +81,9 @@ resource "aws_security_group" "splunk_sg" {
   }
 }
 
-# IAM Roles and Policies
-
-resource "aws_iam_role" "splunk_role" {
-  name = "splunk-instance-role"
-
+resource "aws_iam_role" "ssm_role" {
+  name = "splunk-ssm-role"
+  
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -62,40 +93,6 @@ resource "aws_iam_role" "splunk_role" {
         Principal = {
           Service = "ec2.amazonaws.com"
         }
-      }
-    ]
-  })
-
-  tags = {
-    Name        = "splunk-iam-role"
-    Environment = var.environment
-  }
-}
-
-resource "aws_iam_instance_profile" "splunk_profile" {
-  name = "splunk-instance-profile"
-  role = aws_iam_role.splunk_role.name
-}
-
-resource "aws_iam_role_policy" "splunk_policy" {
-  name = "splunk-instance-policy"
-  role = aws_iam_role.splunk_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "s3:*",
-          "ec2:DescribeInstances",
-          "ec2:DescribeTags",
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogStreams"
-        ]
-        Effect   = "Allow"
-        Resource = "*"
       }
     ]
   })

@@ -1,97 +1,90 @@
-# Splunk Search Heads
 resource "aws_instance" "splunk_search_head" {
-  count                  = 3
-  ami                    = "ami-0c55b159cbfafe1f0" # Replace with appropriate AMI
-  instance_type          = "c5.4xlarge"            # 16 CPU, 32GB RAM
-  key_name               = "splunk-key"            # Replace with your key name
+  count         = 3
+  ami           = var.splunk_ami
+  instance_type = var.search_head_instance_type
+  subnet_id     = element(aws_subnet.public_subnets[*].id, count.index % length(aws_subnet.public_subnets))
   vpc_security_group_ids = [aws_security_group.splunk_sg.id]
-  subnet_id              = aws_subnet.private_subnets[count.index % length(aws_subnet.private_subnets)].id
-  iam_instance_profile   = aws_iam_instance_profile.splunk_profile.name
+  key_name      = var.key_name
+  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
+  #associate_public_ip_address = true
 
   root_block_device {
-    volume_type = "gp3"
     volume_size = 100
-    encrypted   = true
-  }
-
-  ebs_block_device {
-    device_name = "/dev/sdb"
     volume_type = "gp3"
-    volume_size = 200
-    encrypted   = true
   }
-
-  user_data = <<-EOF
-              #!/bin/bash
-              hostnamectl set-hostname splunk-sh${count.index + 1}
-              # Install Splunk commands would go here
-              EOF
+  
+  user_data = file("splunk-sh.sh")
 
   tags = {
-    Name        = "splunk-sh${count.index + 1}"
+    Name        = "splunk-sh-${count.index + 1}"
     Environment = var.environment
     Role        = "search-head"
   }
+
+  depends_on = [aws_internet_gateway.igw, null_resource.script_permissions]
 }
 
-# Splunk Indexers
+locals {
+  user_data_common = <<-EOF
+#!/bin/bash
+# Update system and install SSM agent
+yum update -y
+yum install -y amazon-ssm-agent
+systemctl enable amazon-ssm-agent
+systemctl start amazon-ssm-agent
+
+# Check SSM agent status
+systemctl status amazon-ssm-agent
+EOF
+}
+
 resource "aws_instance" "splunk_indexer" {
-  count                  = 4
-  ami                    = "ami-0c55b159cbfafe1f0" # Replace with appropriate AMI
-  instance_type          = "c5.4xlarge"            # 16 CPU, 32GB RAM
-  key_name               = "splunk-key"            # Replace with your key name
+  count         = 4
+  ami           = var.splunk_ami
+  instance_type = var.indexer_instance_type
+  subnet_id     = element(aws_subnet.private_subnets[*].id, count.index % length(aws_subnet.private_subnets))
   vpc_security_group_ids = [aws_security_group.splunk_sg.id]
-  subnet_id              = aws_subnet.private_subnets[count.index % length(aws_subnet.private_subnets)].id
-  iam_instance_profile   = aws_iam_instance_profile.splunk_profile.name
+  key_name      = var.key_name
+  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
+  #associate_public_ip_address = true
 
   root_block_device {
+    volume_size = 200
     volume_type = "gp3"
-    volume_size = 100
-    encrypted   = true
-  }
-
-  ebs_block_device {
-    device_name = "/dev/sdb"
-    volume_type = "gp3"   # SSD for hot/warm storage
-    volume_size = 200
-    encrypted   = true
-  }
-
-  ebs_block_device {
-    device_name = "/dev/sdc"
-    volume_type = "st1"   # HDD for cold storage
-    volume_size = 200
-    encrypted   = true
   }
 
   user_data = <<-EOF
-              #!/bin/bash
-              hostnamectl set-hostname splunk-idx${count.index + 1}
-              # Install Splunk commands would go here
-              EOF
+${local.user_data_common}
+# Rest of your Splunk search head configuration
+${file("splunk-sh.sh")}
+EOF
 
   tags = {
-    Name        = "splunk-idx${count.index + 1}"
+    Name        = "splunk-idx-${count.index + 1}"
     Environment = var.environment
     Role        = "indexer"
   }
 }
 
-# Splunk Management Components
 resource "aws_instance" "splunk_cluster_manager" {
-  ami                    = "ami-0c55b159cbfafe1f0" # Replace with appropriate AMI
-  instance_type          = "c5.2xlarge"            # 8 CPU, 16GB RAM
-  key_name               = "splunk-key"            # Replace with your key name
+  ami           = var.splunk_ami
+  instance_type = var.cluster_manager_instance_type
+  subnet_id     = aws_subnet.private_subnets[0].id
   vpc_security_group_ids = [aws_security_group.splunk_sg.id]
-  subnet_id              = aws_subnet.private_subnets[0].id
-  iam_instance_profile   = aws_iam_instance_profile.splunk_profile.name
-  user_data              = file("user_data_cm.sh")
+  key_name      = var.key_name
+  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
+  #associate_public_ip_address = true
 
   root_block_device {
-    volume_type = "gp3"
     volume_size = 100
-    encrypted   = true
+    volume_type = "gp3"
   }
+
+  user_data = <<-EOF
+    #!/bin/bash
+    echo "Setting up Splunk Cluster Manager"
+    # Your Splunk configuration commands here
+  EOF
 
   tags = {
     Name        = "splunk-cm"
@@ -101,23 +94,48 @@ resource "aws_instance" "splunk_cluster_manager" {
 }
 
 resource "aws_instance" "splunk_monitoring_console" {
-  ami                    = "ami-0c55b159cbfafe1f0" # Replace with appropriate AMI
-  instance_type          = "c5.xlarge"             # 4 CPU, 8GB RAM
-  key_name               = "splunk-key"            # Replace with your key name
+  ami           = var.splunk_ami
+  instance_type = var.monitoring_console_instance_type
+  subnet_id     = aws_subnet.private_subnets[0].id
   vpc_security_group_ids = [aws_security_group.splunk_sg.id]
-  subnet_id              = aws_subnet.private_subnets[0].id
-  iam_instance_profile   = aws_iam_instance_profile.splunk_profile.name
-  user_data              = file("user_data_mc.sh")
+  key_name      = var.key_name
+  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
+  #associate_public_ip_address = true
 
   root_block_device {
-    volume_type = "gp3"
     volume_size = 100
-    encrypted   = true
+    volume_type = "gp3"
   }
+
+  user_data = <<-EOF
+    #!/bin/bash
+    echo "Setting up Splunk Monitoring Console"
+    # Your Splunk configuration commands here
+  EOF
 
   tags = {
     Name        = "splunk-mc"
     Environment = var.environment
     Role        = "monitoring-console"
+  }
+}
+
+resource "aws_instance" "splunk_license_manager" {
+  ami                         = var.splunk_ami
+  instance_type               = var.license_manager_instance_type
+  subnet_id                   = aws_subnet.private_subnets[0].id
+  vpc_security_group_ids      = [aws_security_group.splunk_sg.id]
+  key_name                    = var.key_name
+  iam_instance_profile        = aws_iam_instance_profile.ssm_instance_profile.name
+  #associate_public_ip_address = true
+
+  root_block_device {
+    volume_size = 100
+    volume_type = "gp3"
+  }
+  tags = {
+    Name        = "splunk-lm"
+    Environment = var.environment
+    Role        = "license-manager"
   }
 }

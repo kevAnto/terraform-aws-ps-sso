@@ -1,7 +1,7 @@
 terraform {
   backend "s3" {
-    bucket = "remote-state-app"
-    region = "us-east-1"
+    bucket = "splunk-smartstore5"
+    region = "ca-central-1"
     key    = "Splunk/terraform.tfstate"
   }
 }

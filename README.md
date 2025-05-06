@@ -1,30 +1,34 @@
-# terraform-code-to-run-k3s-on-an-ec2
-Prerequisites
-An AWS account. If you don’t have one, you can register here.
+Splunk Infrastructure on AWS
 
-A key pair. If you don’t have one, refer to Creating a key pair.
+This project deploys a complete Splunk Enterprise infrastructure on AWS using Terraform. The architecture includes search heads, indexers, cluster manager, monitoring console, and license manager, all configured with proper networking, security, and AWS Systems Manager (SSM) access.
 
-An AWS IAM User with programmatic key access and permissions to launch EC2 instances
+Architecture Overview
+
+VPC: Dedicated VPC with public and private subnets
+Networking: NAT Gateway, Internet Gateway, route tables, security groups
+Components:
+
+3 Search Heads (public subnet)
+4 Indexers (private subnet)
+1 Cluster Manager (private subnet)
+1 Monitoring Console (private subnet)
+1 License Manager (private subnet)
 
 
-Steps for the project
+Load Balancer: Network Load Balancer for search head access
+Management: SSM for secure instance access without SSH
+Storage: S3 bucket for Splunk SmartStore
 
-* Set your remote state
-* terraform init
-* terraform apply
+Required Resources (Create BEFORE Deployment)
+The following resources must be created manually before running Terraform:
 
-Access the Kubeconfig File on the EC2 Instance
- * SSH into the EC2 Instance
+1 - S3 Bucket for Terraform State Backend:
+        splunk-terraform-state-bucket
+        Enable versioning on the bucket
 
- * Locate the Kubeconfig File:
-The Kubeconfig file for K3s is usually located at /etc/rancher/k3s/k3s.yaml.
+2 - S3 Bucket for Splunk SmartStore:
+        Create an S3 bucket named "splunk-smartstore55" in your AWS account
+        This will be used for Splunk data storage
 
-`sudo cat /etc/rancher/k3s/k3s.yaml`
-
- * Modify the Server Address:
-The k3s.yaml file will have a server field that looks like https://127.0.0.1:6443. You need to change this to point to the public IP address or DNS name of your EC2 instance.
-
- * Setup KUBECONFIG Environment Variable
- place your k3s-ec2-kubeconfig.yaml file is in your home directory and do:
-
-`export KUBECONFIG=~/k3s-ec2-kubeconfig.yaml`
+3 - SSH Key Pair:
+        Create an SSH key pair named "splunk-key" (or modify the variable)

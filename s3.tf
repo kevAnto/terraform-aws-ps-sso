@@ -1,27 +1,21 @@
-
-resource "aws_s3_bucket" "splunk_smartstore" {
-  bucket = "splunk-smartstore-${var.environment}"
-
-  tags = {
-    Name        = "splunk-smartstore"
-    Environment = var.environment
-  }
+data "aws_s3_bucket" "splunk_smartstore" {
+  bucket = "splunk-smartstore5"
+  provider = aws.central1
 }
 
-resource "aws_s3_bucket_versioning" "splunk_smartstore_versioning" {
-  bucket = aws_s3_bucket.splunk_smartstore.id
-  
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "splunk_smartstore_encryption" {
-  bucket = aws_s3_bucket.splunk_smartstore.id
+resource "aws_s3_bucket_ownership_controls" "splunk_smartstore" {
+  bucket = data.aws_s3_bucket.splunk_smartstore.id
+  provider = aws.central1 
 
   rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
+    object_ownership = "BucketOwnerPreferred"
   }
+}
+
+resource "aws_s3_bucket_acl" "splunk_smartstore" {
+  bucket = data.aws_s3_bucket.splunk_smartstore.id
+  acl    = "private"
+  provider = aws.central1  
+  
+  depends_on = [aws_s3_bucket_ownership_controls.splunk_smartstore]
 }
