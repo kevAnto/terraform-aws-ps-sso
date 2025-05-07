@@ -1,0 +1,50 @@
+# Development Environment Configuration
+
+# General Configuration
+namePrefix: "splunk-dev"
+environment: "development"
+
+# Network Configuration
+vpcCidr: "10.0.0.0/16"
+publicSubnetCidrs:
+  - "10.0.1.0/24"
+  - "10.0.2.0/24"
+privateSubnetCidrs:
+  - "10.0.4.0/24"
+  - "10.0.5.0/24"
+availabilityZones:
+  - "ca-central-1a"
+  - "ca-central-1b"
+
+# Instance Configuration
+splunkAmi: "ami-03afc49e3def9a472"  # Amazon Linux 2 AMI in ca-central-1
+scriptPath: "../../scripts/splunk-sh.sh"
+
+# Search Head Configuration
+searchHeadCount: 3
+searchHeadInstanceType: "t2.micro"
+searchHeadVolumeSize: 100
+
+# Indexer Configuration
+indexerCount: 4
+indexerInstanceType: "t2.micro"
+indexerVolumeSize: 200
+
+# Manager Configuration
+clusterManagerInstanceType: "t2.micro"
+licenseManagerInstanceType: "t2.micro"
+monitoringConsoleInstanceType: "t2.micro"
+managerVolumeSize: 100
+
+# Cluster Configuration
+clusterLabel: "dev_cluster"
+
+# Load Balancer Configuration
+lbTargetPort: 8000
+lbListenerPort: 443
+
+# Tags
+commonTags:
+  Project: "Splunk"
+  Environment: "development"
+  ManagedBy: "Terraform"

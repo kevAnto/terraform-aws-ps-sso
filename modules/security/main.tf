@@ -1,8 +1,16 @@
-resource "aws_security_group" "splunk_sg" {
-  name        = "splunk-sg"
-  description = "Security group for Splunk instances"
-  vpc_id      = aws_vpc.splunk_vpc.id
+/**
+ * # Security Module
+ * This module handles the creation of security groups, IAM roles and policies
+ * required for the Splunk infrastructure
+ */
 
+# Security Group for Splunk Instances
+resource "aws_security_group" "splunkSg" {
+  name        = "${var.namePrefix}-sg"
+  description = "Security group for Splunk instances"
+  vpc_id      = var.vpcId
+
+  # Web Tier Ports
   ingress {
     from_port   = 80
     to_port     = 80
@@ -19,6 +27,7 @@ resource "aws_security_group" "splunk_sg" {
     description = "HTTPS access"
   }
 
+  # Splunk Web UI
   ingress {
     from_port   = 8000
     to_port     = 8000
@@ -27,6 +36,7 @@ resource "aws_security_group" "splunk_sg" {
     description = "Splunk Web UI"
   }
 
+  # Splunk Management port
   ingress {
     from_port   = 8089
     to_port     = 8089
@@ -35,38 +45,43 @@ resource "aws_security_group" "splunk_sg" {
     description = "Splunk Management port"
   }
 
+  # Cluster replication port
   ingress {
     from_port   = 8191
     to_port     = 8191
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.splunk_vpc.cidr_block]
+    cidr_blocks = [var.vpcCidr]
     description = "Cluster replication"
   }
 
+  # App server feedback port
   ingress {
     from_port   = 9887
     to_port     = 9887
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.splunk_vpc.cidr_block]
+    cidr_blocks = [var.vpcCidr]
     description = "App server feedback"
   }
 
+  # Forwarding/receiving port
   ingress {
     from_port   = 9997
     to_port     = 9997
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.splunk_vpc.cidr_block]
+    cidr_blocks = [var.vpcCidr]
     description = "Data forwarding"
   }
 
+  # Internal Communications
   ingress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = [aws_vpc.splunk_vpc.cidr_block]
+    cidr_blocks = [var.vpcCidr]
     description = "Internal VPC communication"
   }
 
+  # Allow all outbound traffic
   egress {
     from_port   = 0
     to_port     = 0
@@ -75,14 +90,17 @@ resource "aws_security_group" "splunk_sg" {
     description = "All outbound traffic"
   }
 
-  tags = {
-    Name        = "splunk-sg"
-    Environment = var.environment
-  }
+  tags = merge(
+    var.commonTags,
+    {
+      Name = "${var.namePrefix}-sg"
+    }
+  )
 }
 
-resource "aws_iam_role" "ssm_role" {
-  name = "splunk-ssm-role"
+# IAM Role for SSM
+resource "aws_iam_role" "ssmRole" {
+  name = "${var.namePrefix}-ssm-role"
   
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -96,4 +114,17 @@ resource "aws_iam_role" "ssm_role" {
       }
     ]
   })
+
+}
+
+# Attach SSM policy to the role
+resource "aws_iam_role_policy_attachment" "ssmPolicy" {
+  role       = aws_iam_role.ssmRole.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# Create instance profile
+resource "aws_iam_instance_profile" "ssmInstanceProfile" {
+  name = "${var.namePrefix}-ssm-instance-profile"
+  role = aws_iam_role.ssmRole.name
 }
