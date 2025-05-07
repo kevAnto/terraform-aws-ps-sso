@@ -1,11 +1,3 @@
-/**
- * Development Environment
- * 
- * This is the main entry point for the development environment.
- * It sets up all the resources needed for Splunk in the development environment.
- */
-
-# Import the locals from the YAML file
 locals {
   config = yamldecode(file("${path.module}/locals.yaml"))
 }

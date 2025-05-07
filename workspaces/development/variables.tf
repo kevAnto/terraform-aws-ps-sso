@@ -1,7 +1,3 @@
-/**
- * Variables for development environment
- */
-
 variable "awsRegion" {
   description = "AWS region"
   type        = string

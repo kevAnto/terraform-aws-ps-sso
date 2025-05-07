@@ -1,5 +1,3 @@
-# Development Environment Configuration
-
 # General Configuration
 namePrefix: "splunk-dev"
 environment: "development"
@@ -18,7 +16,7 @@ availabilityZones:
 
 # Instance Configuration
 splunkAmi: "ami-03afc49e3def9a472"  # Amazon Linux 2 AMI in ca-central-1
-scriptPath: "../../scripts/splunk-sh.sh"
+scriptPath: "../../scripts/splunk.yml"
 
 # Search Head Configuration
 searchHeadCount: 3

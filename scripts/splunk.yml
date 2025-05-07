@@ -1,0 +1,264 @@
+#cloud-config
+
+# Update and install required packages
+package_update: true
+package_upgrade: true
+packages:
+  - wget
+  - tar
+  - python3
+  - net-tools
+  - vim
+  - ntp
+
+# Set up users and groups
+groups:
+  - splunk
+users:
+  - name: splunk
+    groups: splunk
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+    # Set password for the splunk user (this is a hashed password example)
+    # Generate your own with: openssl passwd -6 "YourPassword"
+    passwd: "$6$rounds=4096$saltsalt$Cjp8jaH2iHfHYV7kG9jnVD6GVjJy/zHyMCJ6dM.aiZ2XUjyRiKQgPLqxHrVI9XYlAqEbgXSjauOZD2xUTlrSk/"
+
+# Create directories
+write_files:
+  - path: /etc/systemd/system/splunk.service
+    content: |
+      [Unit]
+      Description=Splunk Enterprise
+      After=network.target
+      Wants=network.target
+
+      [Service]
+      Type=forking
+      User=splunk
+      Group=splunk
+      ExecStart=/opt/splunk/bin/splunk start --accept-license --answer-yes --no-prompt
+      ExecStop=/opt/splunk/bin/splunk stop
+      ExecReload=/opt/splunk/bin/splunk restart
+      PIDFile=/opt/splunk/var/run/splunk/splunkd.pid
+      LimitNOFILE=65536
+      Restart=on-failure
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+      
+  - path: /tmp/setup_inputs.conf
+    content: |
+      [udp://514]
+      disabled = false
+      sourcetype = syslog
+      
+      [tcp://9997]
+      disabled = false
+      
+  - path: /tmp/setup_outputs.conf
+    content: |
+      [indexer_discovery:cluster1]
+      pass4SymmKey = changeme
+      master_uri = https://INDEXER_CLUSTER_MASTER_IP:8089
+      
+      [tcpout:group1]
+      server = INDEXER1:9997, INDEXER2:9997
+      
+      [tcpout]
+      defaultGroup = group1
+      
+  - path: /tmp/setup_server.conf
+    content: |
+      [general]
+      site = site1
+      
+      [clustering]
+      mode = master
+      replication_factor = 2
+      search_factor = 2
+      pass4SymmKey = changeme
+      cluster_label = cluster1
+      
+  - path: /tmp/resize_volume.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      # Resize the EBS volume if needed
+      ROOT_DISK=$(df -h | grep -w / | awk '{print $1}')
+      DEVICE_NAME=$(lsblk -o NAME,MOUNTPOINT | grep -w / | awk '{print $1}')
+      DEVICE_NAME=${DEVICE_NAME%??}
+      
+      # Get the partition number
+      PARTITION_NUM=$(lsblk -o NAME,MOUNTPOINT | grep -w / | awk '{print $1}' | grep -o '[0-9]*$')
+      
+      # Resize the partition
+      growpart /dev/$DEVICE_NAME $PARTITION_NUM
+      
+      # Resize the filesystem
+      if [[ "$ROOT_DISK" == *"xfs"* ]]; then
+        xfs_growfs /
+      else
+        resize2fs /dev/${DEVICE_NAME}${PARTITION_NUM}
+      fi
+  
+  - path: /opt/install_splunk.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      
+      # Set Splunk version and download URL
+      SPLUNK_VERSION="9.1.1"
+      SPLUNK_BUILD="64e843ea36b1"
+      SPLUNK_FILENAME="splunk-${SPLUNK_VERSION}-${SPLUNK_BUILD}-Linux-x86_64.tgz"
+      SPLUNK_URL="https://download.splunk.com/products/splunk/releases/${SPLUNK_VERSION}/${SPLUNK_BUILD}/${SPLUNK_FILENAME}"
+      SPLUNK_ADMIN_PASSWORD="ChangeMe123!"  # CHANGE THIS TO A SECURE PASSWORD
+      
+      # Download Splunk
+      echo "Downloading Splunk Enterprise..."
+      wget -O /tmp/${SPLUNK_FILENAME} ${SPLUNK_URL}
+      
+      # Verify download
+      if [ $? -ne 0 ]; then
+        echo "Failed to download Splunk. Exiting."
+        exit 1
+      fi
+      
+      # Install Splunk
+      echo "Installing Splunk Enterprise..."
+      cd /tmp
+      tar -xzf ${SPLUNK_FILENAME} -C /opt
+      
+      # Set permissions
+      chown -R splunk:splunk /opt/splunk
+      
+      # Create user-seed.conf to set admin password
+      mkdir -p /opt/splunk/etc/system/local
+      cat > /opt/splunk/etc/system/local/user-seed.conf << EOF
+      [user_info]
+      PASSWORD = ${SPLUNK_ADMIN_PASSWORD}
+      EOF
+      
+      # Configure Splunk to start at boot
+      /opt/splunk/bin/splunk enable boot-start -user splunk --accept-license --answer-yes --no-prompt
+      
+      # Create default configuration
+      echo "Configuring Splunk..."
+      
+      # Security hardening
+      cat > /opt/splunk/etc/system/local/server.conf << EOF
+      [general]
+      allowRemoteLogin = always
+      pass4SymmKey = changeme
+      
+      [sslConfig]
+      enableSplunkdSSL = true
+      useClientSSLCompression = true
+      
+      [diskUsage]
+      minFreeSpace = 5000
+      EOF
+      
+      # Configure web.conf for session timeout and other web settings
+      cat > /opt/splunk/etc/system/local/web.conf << EOF
+      [settings]
+      enableSplunkWebSSL = true
+      login_content = Welcome to Splunk Enterprise
+      session_timeout = 1h
+      EOF
+      
+      # Copy default inputs config
+      cp /tmp/setup_inputs.conf /opt/splunk/etc/system/local/inputs.conf
+      
+      # Setup indexes
+      cat > /opt/splunk/etc/system/local/indexes.conf << EOF
+      [default]
+      homePath = \$SPLUNK_DB/\$_index_name/db
+      coldPath = \$SPLUNK_DB/\$_index_name/colddb
+      thawedPath = \$SPLUNK_DB/\$_index_name/thaweddb
+      maxTotalDataSizeMB = 500000
+      maxWarmDBCount = 300
+      
+      [main]
+      homePath = \$SPLUNK_DB/main/db
+      coldPath = \$SPLUNK_DB/main/colddb
+      thawedPath = \$SPLUNK_DB/main/thaweddb
+      maxTotalDataSizeMB = 200000
+      
+      [history]
+      homePath = \$SPLUNK_DB/history/db
+      coldPath = \$SPLUNK_DB/history/colddb
+      thawedPath = \$SPLUNK_DB/history/thaweddb
+      maxTotalDataSizeMB = 50000
+      
+      [summary]
+      homePath = \$SPLUNK_DB/summary/db
+      coldPath = \$SPLUNK_DB/summary/colddb
+      thawedPath = \$SPLUNK_DB/summary/thaweddb
+      maxTotalDataSizeMB = 50000
+      
+      [_audit]
+      homePath = \$SPLUNK_DB/_audit/db
+      coldPath = \$SPLUNK_DB/_audit/colddb
+      thawedPath = \$SPLUNK_DB/_audit/thaweddb
+      
+      [_internal]
+      homePath = \$SPLUNK_DB/_internal/db
+      coldPath = \$SPLUNK_DB/_internal/colddb
+      thawedPath = \$SPLUNK_DB/_internal/thaweddb
+      maxTotalDataSizeMB = 50000
+      EOF
+      
+      # Start Splunk for the first time
+      echo "Starting Splunk..."
+      systemctl start splunk
+      systemctl enable splunk
+      
+      # Configure firewall if it's active
+      if systemctl is-active --quiet firewalld; then
+        firewall-cmd --permanent --add-port=8000/tcp
+        firewall-cmd --permanent --add-port=8089/tcp
+        firewall-cmd --permanent --add-port=9997/tcp
+        firewall-cmd --permanent --add-port=514/udp
+        firewall-cmd --reload
+      fi
+      
+      # Set hostname based on EC2 instance metadata
+      INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+      REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+      HOSTNAME="splunk-${REGION}-${INSTANCE_ID}"
+      hostnamectl set-hostname ${HOSTNAME}
+      
+      echo "Splunk Enterprise installation completed successfully!"
+
+# Configure SSH to allow password authentication
+  - path: /etc/ssh/sshd_config.d/99-enable-passwords.conf
+    content: |
+      # Enable password authentication
+      PasswordAuthentication yes
+      ChallengeResponseAuthentication no
+      UsePAM yes
+
+# Run commands on first boot
+runcmd:
+  - [ sh, /tmp/resize_volume.sh ]
+  - [ chown, -R, splunk:splunk, /opt ]
+  - [ sh, /opt/install_splunk.sh ]
+  # Tune the system for Splunk
+  - echo "* soft nofile 65536" >> /etc/security/limits.conf
+  - echo "* hard nofile 65536" >> /etc/security/limits.conf
+  - echo "* soft nproc 16384" >> /etc/security/limits.conf
+  - echo "* hard nproc 16384" >> /etc/security/limits.conf
+  - sysctl -w vm.max_map_count=262144
+  - echo "vm.max_map_count = 262144" >> /etc/sysctl.conf
+  - systemctl restart systemd-sysctl
+  # For real deployments, we should set up disk mounts and configure them here
+  # Enable and start NTP for time synchronization
+  - systemctl enable ntpd
+  - systemctl start ntpd
+  # Apply SSH config changes
+  - systemctl restart sshd
+  # Final Splunk service start
+  - [ systemctl, start, splunk ]
+  - [ systemctl, enable, splunk ]
